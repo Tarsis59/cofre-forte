@@ -1,103 +1,297 @@
+"use client";
+
 import Image from "next/image";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 
-export default function Home() {
+import { zodResolver } from "@hookform/resolvers/zod";
+import { AnimatePresence, motion } from "framer-motion";
+import { Chrome, ShieldCheck } from "lucide-react";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
+import { auth } from "@/lib/firebase";
+import {
+  createUserWithEmailAndPassword,
+  GoogleAuthProvider,
+  signInWithEmailAndPassword,
+  signInWithPopup,
+  User,
+} from "firebase/auth";
+
+const formSchema = z.object({
+  email: z.string().email({ message: "Por favor, insira um email válido." }),
+  password: z
+    .string()
+    .min(6, { message: "A senha deve ter no mínimo 6 caracteres." }),
+});
+
+export default function LoginPage() {
+  const router = useRouter();
+  const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState<"login" | "register">("login");
+
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: { email: "", password: "" },
+  });
+
+  const handleLoginSuccess = (loggedInUser: User) => {
+    setUser(loggedInUser);
+
+    setIsLoading(true);
+
+    setTimeout(() => {
+      router.push("/dashboard");
+    }, 2000);
+  };
+
+  const onSubmit = async (values: z.infer<typeof formSchema>) => {
+    setIsLoading(true);
+    const { email, password } = values;
+    try {
+      let userCredential;
+      if (activeTab === "login") {
+        userCredential = await signInWithEmailAndPassword(
+          auth,
+          email,
+          password
+        );
+      } else {
+        userCredential = await createUserWithEmailAndPassword(
+          auth,
+          email,
+          password
+        );
+      }
+      handleLoginSuccess(userCredential.user);
+    } catch (error: any) {
+      if (error?.code === "auth/email-already-in-use") {
+        alert("Este e-mail já está em uso. Tente fazer login.");
+      } else if (
+        error?.code === "auth/wrong-password" ||
+        error?.code === "auth/user-not-found" ||
+        error?.code === "auth/invalid-credential"
+      ) {
+        alert("E-mail ou senha incorretos.");
+      } else {
+        console.error("Erro de autenticação:", error);
+        alert("Ocorreu um erro. Tente novamente.");
+      }
+      setIsLoading(false);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    setIsLoading(true);
+    const provider = new GoogleAuthProvider();
+    try {
+      const result = await signInWithPopup(auth, provider);
+      handleLoginSuccess(result.user);
+    } catch (error: any) {
+      console.error("Erro no login com Google:", error);
+      if (error?.code === "auth/popup-blocked") {
+        alert("O pop-up foi bloqueado. Permita pop-ups e tente novamente.");
+      } else {
+        alert("Erro ao autenticar com Google. Tente novamente.");
+      }
+      setIsLoading(false);
+    }
+  };
+
+  const formFields = (
+    <>
+      <FormField
+        control={form.control}
+        name="email"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>Email</FormLabel>
+            <FormControl>
+              <Input placeholder="seu@email.com" {...field} />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+
+      <FormField
+        control={form.control}
+        name="password"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>Senha</FormLabel>
+            <FormControl>
+              <Input type="password" placeholder="••••••••" {...field} />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+    </>
+  );
+
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+    <main className="flex min-h-screen flex-col items-center justify-center p-4 bg-slate-950">
+      <motion.div
+        className="w-full h-full flex items-center justify-center"
+        initial={{ opacity: 0, scale: 0.98 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.45 }}
+      >
+        <Card
+          className="w-full min-h-screen rounded-none border-none shadow-none flex flex-col justify-center
+                     sm:max-w-[420px] sm:min-h-fit sm:h-auto sm:rounded-2xl sm:border sm:border-slate-700/50 sm:shadow-2xl
+                     bg-black/40 backdrop-blur-xl text-white shadow-green-500/10"
+        >
+          <CardHeader className="items-center text-center p-6 pb-4">
+            <motion.div
+              className="w-full flex justify-center"
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.45, delay: 0.15 }}
+            >
+              <Image
+                src="/Cofre-Forte.png"
+                alt="Cofre Forte Logo"
+                width={60}
+                height={60}
+                className="mb-4"
+              />
+            </motion.div>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+            <div className="flex items-center justify-center gap-2">
+              <ShieldCheck className="h-8 w-8 text-green-400" />
+              <CardTitle className="text-3xl font-bold tracking-tighter whitespace-nowrap bg-gradient-to-r from-green-400 to-cyan-400 bg-clip-text text-transparent">
+                Cofre Forte
+              </CardTitle>
+            </div>
+          </CardHeader>
+
+          <CardContent className="p-6 pt-2">
+            <AnimatePresence mode="wait">
+              {user ? (
+                <motion.div
+                  key="user-info"
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ duration: 0.35 }}
+                  className="flex flex-col items-center gap-4 text-center py-8"
+                >
+                  <Avatar className="h-20 w-20 border-2 border-green-400">
+                    <AvatarImage src={user.photoURL || ""} />
+                    <AvatarFallback>
+                      {user.displayName?.charAt(0) || user.email?.charAt(0)}
+                    </AvatarFallback>
+                  </Avatar>
+
+                  <div className="mt-2">
+                    <p className="font-bold text-lg">
+                      {user.displayName || user.email}
+                    </p>
+                    <p className="text-xs text-slate-400">
+                      Login efetuado com sucesso!
+                    </p>
+                  </div>
+
+                  {}
+                  <div className="w-full bg-slate-700 rounded-full h-1.5 mt-4 overflow-hidden">
+                    <motion.div
+                      className="bg-gradient-to-r from-green-400 to-cyan-400 h-1.5 rounded-full"
+                      initial={{ width: "0%" }}
+                      animate={{ width: "100%" }}
+                      transition={{ duration: 2, ease: "linear" }}
+                    />
+                  </div>
+
+                  <p className="text-xs text-slate-500 mt-2 animate-pulse">
+                    Preparando seu dashboard...
+                  </p>
+                </motion.div>
+              ) : (
+                <motion.div
+                  key={activeTab}
+                  initial={{ opacity: 0, y: -6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.25 }}
+                >
+                  <Tabs
+                    value={activeTab}
+                    onValueChange={(value) => {
+                      setActiveTab(value as "login" | "register");
+                      form.reset();
+                    }}
+                    className="w-full"
+                  >
+                    <TabsList className="grid w-full grid-cols-2 bg-slate-800/50">
+                      <TabsTrigger value="login">Entrar</TabsTrigger>
+                      <TabsTrigger value="register">Registrar</TabsTrigger>
+                    </TabsList>
+
+                    <Form {...form}>
+                      <form
+                        onSubmit={form.handleSubmit(onSubmit)}
+                        className="space-y-4 mt-4"
+                      >
+                        <div className="space-y-4">{formFields}</div>
+
+                        <Button
+                          type="submit"
+                          disabled={isLoading}
+                          className="w-full !mt-6"
+                        >
+                          {isLoading
+                            ? "Aguarde..."
+                            : activeTab === "login"
+                            ? "Entrar"
+                            : "Criar Conta"}
+                        </Button>
+                      </form>
+                    </Form>
+
+                    {}
+                    <div className="relative my-6">
+                      <div className="absolute inset-0 flex items-center">
+                        <span className="w-full border-t border-slate-700" />
+                      </div>
+                      <div className="relative flex justify-center text-xs uppercase">
+                        <span className="bg-black/40 px-2 text-slate-400">
+                          Ou
+                        </span>
+                      </div>
+                    </div>
+
+                    <Button
+                      variant="outline"
+                      onClick={handleGoogleSignIn}
+                      disabled={isLoading}
+                      className="w-full gap-2 bg-transparent"
+                    >
+                      <Chrome className="h-5 w-5" /> Google
+                    </Button>
+                  </Tabs>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </CardContent>
+        </Card>
+      </motion.div>
+    </main>
   );
 }
