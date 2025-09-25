@@ -55,9 +55,10 @@ const subscriptionSchema = z.object({
   name: z.string().min(2, { message: "O nome deve ter pelo menos 2 caracteres." }),
   value: z.coerce.number().positive({ message: "O valor deve ser positivo." }),
   sharedWithCount: z.coerce.number().min(1, { message: "Deve ser pelo menos 1." }).optional(),
-  category: z.enum(['Streaming', 'Trabalho', 'Bem-estar', 'Jogos', 'Outro'], { required_error: "Selecione uma categoria." }),
-  cycle: z.enum(['monthly', 'annually'], { required_error: "Selecione um ciclo." }),
-  billingDate: z.date({ required_error: "A data de cobrança é obrigatória." }),
+  // A sintaxe inválida { required_error: ... } foi removida abaixo
+  category: z.enum(['Streaming', 'Trabalho', 'Bem-estar', 'Jogos', 'Outro']),
+  cycle: z.enum(['monthly', 'annually']),
+  billingDate: z.date(),
   description: z.string().optional(),
   isGhost: z.boolean().default(false),
 });
