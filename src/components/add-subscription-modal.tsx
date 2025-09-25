@@ -53,14 +53,8 @@ import toast from "react-hot-toast";
  */
 const subscriptionSchema = z.object({
   name: z.string().min(2, { message: "O nome deve ter pelo menos 2 caracteres." }),
-  value: z.preprocess(
-    (val) => (val === "" || val === null || typeof val === "undefined" ? undefined : Number(val)),
-    z.number({ invalid_type_error: "Valor inválido." }).positive({ message: "O valor deve ser positivo." })
-  ),
-  sharedWithCount: z.preprocess(
-    (val) => (val === "" || val === null || typeof val === "undefined" ? undefined : Number(val)),
-    z.number({ invalid_type_error: "Valor inválido." }).min(1, { message: "Deve ser pelo menos 1." }).optional()
-  ),
+  value: z.coerce.number().positive({ message: "O valor deve ser positivo." }),
+  sharedWithCount: z.coerce.number().min(1, { message: "Deve ser pelo menos 1." }).optional(),
   category: z.enum(['Streaming', 'Trabalho', 'Bem-estar', 'Jogos', 'Outro'], { required_error: "Selecione uma categoria." }),
   cycle: z.enum(['monthly', 'annually'], { required_error: "Selecione um ciclo." }),
   billingDate: z.date({ required_error: "A data de cobrança é obrigatória." }),
