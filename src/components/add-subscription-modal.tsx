@@ -1,5 +1,3 @@
-// Arquivo: src/components/add-subscription-modal.tsx (VERSÃO FINAL E FUNCIONAL)
-
 "use client";
 
 import { Button } from "@/components/ui/button";
@@ -7,6 +5,7 @@ import { Calendar } from "@/components/ui/calendar";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -20,7 +19,11 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -42,39 +45,30 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { auth, db } from "@/lib/firebase";
-import { Timestamp, addDoc, collection, doc, updateDoc } from "firebase/firestore";
+import {
+  Timestamp,
+  addDoc,
+  collection,
+  doc,
+  updateDoc,
+} from "firebase/firestore";
 
 import toast from "react-hot-toast";
 
-/**
- * Schema de validação:
- * - z.preprocess trata inputs vazios e converte para Number antes de validar.
- * - billingDate exige um Date.
- */
 const subscriptionSchema = z.object({
-  name: z.string().min(2, { message: "O nome deve ter pelo menos 2 caracteres." }),
-  value: z.preprocess(
-    (val) => (String(val).trim() === "" ? undefined : Number(val)),
-    z.number({ required_error: "O valor é obrigatório.", invalid_type_error: "Valor inválido." })
-     .positive({ message: "O valor deve ser positivo." })
-  ),
-  sharedWithCount: z.preprocess(
-    (val) => (String(val).trim() === "" ? 1 : Number(val)),
-    z.number({ invalid_type_error: "Valor inválido." })
-     .min(1, { message: "Deve ser pelo menos 1." })
-     .optional()
-  ),
-  category: z.enum(['Streaming', 'Trabalho', 'Bem-estar', 'Jogos', 'Outro'], {
-    required_error: "Selecione uma categoria.",
-  }),
-  cycle: z.enum(['monthly', 'annually'], {
-    required_error: "Selecione um ciclo.",
-  }),
-  billingDate: z.date({
-    required_error: "A data de cobrança é obrigatória.",
-  }),
-  description: z.string().optional(),
+  name: z
+    .string()
+    .min(2, { message: "O nome deve ter pelo menos 2 caracteres." }),
+  value: z.coerce.number().positive({ message: "O valor deve ser positivo." }),
+  sharedWithCount: z.coerce
+    .number()
+    .min(1, { message: "Deve ser pelo menos 1." })
+    .optional(),
+  billingDate: z.date(),
+  category: z.enum(["Streaming", "Trabalho", "Bem-estar", "Jogos", "Outro"]),
+  cycle: z.enum(["monthly", "annually"]),
   isGhost: z.boolean().default(false),
+  description: z.string().optional(),
 });
 
 interface AddSubscriptionModalProps {
@@ -82,13 +76,15 @@ interface AddSubscriptionModalProps {
   subscriptionToEdit?: Subscription;
 }
 
-export function AddSubscriptionModal({ trigger, subscriptionToEdit }: AddSubscriptionModalProps) {
+export function AddSubscriptionModal({
+  trigger,
+  subscriptionToEdit,
+}: AddSubscriptionModalProps) {
   const [open, setOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   const isEditMode = !!subscriptionToEdit;
 
-  // Helper seguro para transformar valores de billingDate (Timestamp | Date | number | string) em Date
   const billingDateToDate = (val: any): Date => {
     if (!val) return new Date();
     if (typeof val?.toDate === "function") return val.toDate();
@@ -103,9 +99,11 @@ export function AddSubscriptionModal({ trigger, subscriptionToEdit }: AddSubscri
     defaultValues: isEditMode
       ? {
           name: subscriptionToEdit!.name,
-          value: subscriptionToEdit!.value as any, // será validado pelo Zod
+          value: subscriptionToEdit!.value,
           sharedWithCount: (subscriptionToEdit as any)?.sharedWithCount ?? 1,
-          billingDate: billingDateToDate((subscriptionToEdit as any)?.billingDate),
+          billingDate: billingDateToDate(
+            (subscriptionToEdit as any).billingDate
+          ),
           category: subscriptionToEdit!.category ?? "Streaming",
           cycle: subscriptionToEdit!.cycle ?? "monthly",
           description: (subscriptionToEdit as any)?.description ?? "",
@@ -134,10 +132,12 @@ export function AddSubscriptionModal({ trigger, subscriptionToEdit }: AddSubscri
     }
 
     try {
-      // Garantir sharedWithCount mínimo
-      const sharedWithCount = values.sharedWithCount && values.sharedWithCount > 0 ? values.sharedWithCount : 1;
+      const sharedWithCount =
+        values.sharedWithCount && values.sharedWithCount > 0
+          ? values.sharedWithCount
+          : 1;
 
-      const dataToSave = {
+      const payload = {
         name: values.name,
         value: values.value,
         sharedWithCount,
@@ -149,13 +149,24 @@ export function AddSubscriptionModal({ trigger, subscriptionToEdit }: AddSubscri
       };
 
       if (isEditMode && subscriptionToEdit) {
-        const docRef = doc(db, "users", currentUser.uid, "subscriptions", subscriptionToEdit.id);
-        await updateDoc(docRef, dataToSave);
+        const docRef = doc(
+          db,
+          "users",
+          currentUser.uid,
+          "subscriptions",
+          subscriptionToEdit.id
+        );
+        await updateDoc(docRef, { ...payload });
         toast.success("Assinatura atualizada com sucesso!");
       } else {
-        const collectionRef = collection(db, "users", currentUser.uid, "subscriptions");
+        const collectionRef = collection(
+          db,
+          "users",
+          currentUser.uid,
+          "subscriptions"
+        );
         await addDoc(collectionRef, {
-          ...dataToSave,
+          ...payload,
           userId: currentUser.uid,
           isActive: true,
           createdAt: Timestamp.now(),
@@ -177,13 +188,23 @@ export function AddSubscriptionModal({ trigger, subscriptionToEdit }: AddSubscri
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{trigger}</DialogTrigger>
 
-      <DialogContent className="sm:max-w-lg bg-slate-900 border-slate-700 text-white">
+      <DialogContent className="sm:max-w-[525px] bg-slate-900 border-slate-700 text-white">
         <DialogHeader>
-          <DialogTitle>{isEditMode ? "Editar Assinatura" : "Adicionar Nova Assinatura"}</DialogTitle>
+          <DialogTitle>
+            {isEditMode ? "Editar Assinatura" : "Adicionar Nova Assinatura"}
+          </DialogTitle>
+          <DialogDescription>
+            {isEditMode
+              ? "Atualize os detalhes da sua assinatura."
+              : "Preencha os detalhes para começar a monitorar."}
+          </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
+          <form
+            onSubmit={form.handleSubmit(onSubmit)}
+            className="space-y-4 max-h-[70vh] overflow-y-auto pr-2"
+          >
             {/* Nome */}
             <FormField
               control={form.control}
@@ -199,7 +220,7 @@ export function AddSubscriptionModal({ trigger, subscriptionToEdit }: AddSubscri
               )}
             />
 
-            {/* Valor + Dividido entre (responsivo) */}
+            {/* Valor + Dividido entre */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
@@ -211,11 +232,18 @@ export function AddSubscriptionModal({ trigger, subscriptionToEdit }: AddSubscri
                       <Input
                         type="number"
                         step="0.01"
-                        placeholder="Ex: 39.90"
+                        placeholder="Ex: 39,90"
                         {...field}
-                        // react-hook-form já trata value como number após preprocess; mantemos segurança UX
-                        onChange={(e) => field.onChange(e.target.value === "" ? undefined : Number(e.target.value))}
-                        value={field.value === undefined ? "" : String(field.value)}
+                        onChange={(e) =>
+                          field.onChange(
+                            e.target.value === ""
+                              ? undefined
+                              : Number(e.target.value)
+                          )
+                        }
+                        value={
+                          field.value === undefined ? "" : String(field.value)
+                        }
                       />
                     </FormControl>
                     <FormMessage />
@@ -235,8 +263,16 @@ export function AddSubscriptionModal({ trigger, subscriptionToEdit }: AddSubscri
                         min={1}
                         placeholder="Nº de pessoas"
                         {...field}
-                        onChange={(e) => field.onChange(e.target.value === "" ? undefined : Number(e.target.value))}
-                        value={field.value === undefined ? "1" : String(field.value)}
+                        onChange={(e) =>
+                          field.onChange(
+                            e.target.value === ""
+                              ? undefined
+                              : Number(e.target.value)
+                          )
+                        }
+                        value={
+                          field.value === undefined ? "1" : String(field.value)
+                        }
                       />
                     </FormControl>
                     <FormMessage />
@@ -253,12 +289,18 @@ export function AddSubscriptionModal({ trigger, subscriptionToEdit }: AddSubscri
                 <FormItem>
                   <FormLabel>Categoria</FormLabel>
                   <FormControl>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <SelectTrigger>
                         <SelectValue placeholder="Selecione uma categoria" />
                       </SelectTrigger>
                       <SelectContent>
-                        {['Streaming', 'Trabalho', 'Bem-estar', 'Jogos', 'Outro'].map((cat) => (
+                        {[
+                          "Streaming",
+                          "Trabalho",
+                          "Bem-estar",
+                          "Jogos",
+                          "Outro",
+                        ].map((cat) => (
                           <SelectItem key={cat} value={cat}>
                             {cat}
                           </SelectItem>
@@ -279,7 +321,7 @@ export function AddSubscriptionModal({ trigger, subscriptionToEdit }: AddSubscri
                 <FormItem>
                   <FormLabel>Ciclo</FormLabel>
                   <FormControl>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <SelectTrigger>
                         <SelectValue placeholder="Selecione o ciclo de cobrança" />
                       </SelectTrigger>
@@ -306,9 +348,16 @@ export function AddSubscriptionModal({ trigger, subscriptionToEdit }: AddSubscri
                       <FormControl>
                         <Button
                           variant="outline"
-                          className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}
+                          className={cn(
+                            "w-full pl-3 text-left font-normal",
+                            !field.value && "text-muted-foreground"
+                          )}
                         >
-                          {field.value ? format(field.value as Date, "PPP", { locale: ptBR }) : <span>Escolha uma data</span>}
+                          {field.value ? (
+                            format(field.value as Date, "PPP", { locale: ptBR })
+                          ) : (
+                            <span>Escolha uma data</span>
+                          )}
                           <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                         </Button>
                       </FormControl>
@@ -357,10 +406,15 @@ export function AddSubscriptionModal({ trigger, subscriptionToEdit }: AddSubscri
                 <FormItem className="flex flex-row items-center justify-between rounded-lg border border-slate-700 p-3 shadow-sm">
                   <div className="space-y-0.5">
                     <FormLabel className="text-white">Modo Fantasma</FormLabel>
-                    <p className="text-xs text-slate-400">Apenas planejar, não incluir nos gastos totais.</p>
+                    <p className="text-xs text-slate-400">
+                      Apenas planejar, não incluir nos gastos totais.
+                    </p>
                   </div>
                   <FormControl>
-                    <Switch checked={!!field.value} onCheckedChange={(v: boolean) => field.onChange(v)} />
+                    <Switch
+                      checked={!!field.value}
+                      onCheckedChange={(v: boolean) => field.onChange(v)}
+                    />
                   </FormControl>
                 </FormItem>
               )}
@@ -368,7 +422,11 @@ export function AddSubscriptionModal({ trigger, subscriptionToEdit }: AddSubscri
 
             {/* Botão salvar */}
             <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? "Salvando..." : isEditMode ? "Salvar Alterações" : "Salvar Assinatura"}
+              {isLoading
+                ? "Salvando..."
+                : isEditMode
+                ? "Salvar Alterações"
+                : "Salvar Assinatura"}
             </Button>
           </form>
         </Form>

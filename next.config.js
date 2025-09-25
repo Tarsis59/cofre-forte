@@ -1,6 +1,4 @@
 /** @type {import('next').NextConfig} */
-const nextConfig = {
-  // Pode haver outras configurações aqui, mas NENHUMA de eslint
-};
+const nextConfig = {};
 
 module.exports = nextConfig;

@@ -1,5 +1,3 @@
-// Arquivo: src/components/dynamic-icon.tsx
-
 import {
     Award,
     BrainCircuit,
@@ -19,7 +17,6 @@ const icons = {
   Award,
 };
 
-// Garantimos que este tipo seja exportado para ser usado em outros lugares
 export type IconName = keyof typeof icons;
 
 interface DynamicIconProps extends LucideProps {
