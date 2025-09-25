@@ -1,36 +1,14 @@
+// Arquivo: src/components/add-subscription-modal.tsx (VERSÃO CORRIGIDA)
+
 "use client";
 
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -45,29 +23,19 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { auth, db } from "@/lib/firebase";
-import {
-  Timestamp,
-  addDoc,
-  collection,
-  doc,
-  updateDoc,
-} from "firebase/firestore";
+import { Timestamp, addDoc, collection, doc, updateDoc } from "firebase/firestore";
 
 import toast from "react-hot-toast";
 
+// ✅ Esquema corrigido
 const subscriptionSchema = z.object({
-  name: z
-    .string()
-    .min(2, { message: "O nome deve ter pelo menos 2 caracteres." }),
+  name: z.string().min(2, { message: "O nome deve ter pelo menos 2 caracteres." }),
   value: z.coerce.number().positive({ message: "O valor deve ser positivo." }),
-  sharedWithCount: z.coerce
-    .number()
-    .min(1, { message: "Deve ser pelo menos 1." })
-    .optional(),
-  billingDate: z.date({ required_error: "A data de cobrança é obrigatória." }),
+  sharedWithCount: z.coerce.number().min(1, { message: "Deve ser pelo menos 1." }).optional(),
+  billingDate: z.date(), // <-- CORREÇÃO: removido objeto inválido
   category: z.enum(["Streaming", "Trabalho", "Bem-estar", "Jogos", "Outro"]),
   cycle: z.enum(["monthly", "annually"]),
-  isGhost: z.boolean().optional(),
+  isGhost: z.boolean().default(false),
   description: z.string().optional(),
 });
 
@@ -76,10 +44,7 @@ interface AddSubscriptionModalProps {
   subscriptionToEdit?: Subscription;
 }
 
-export function AddSubscriptionModal({
-  trigger,
-  subscriptionToEdit,
-}: AddSubscriptionModalProps) {
+export function AddSubscriptionModal({ trigger, subscriptionToEdit }: AddSubscriptionModalProps) {
   const [open, setOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -101,9 +66,7 @@ export function AddSubscriptionModal({
           name: subscriptionToEdit!.name,
           value: subscriptionToEdit!.value,
           sharedWithCount: (subscriptionToEdit as any)?.sharedWithCount ?? 1,
-          billingDate: billingDateToDate(
-            (subscriptionToEdit as any).billingDate
-          ),
+          billingDate: billingDateToDate((subscriptionToEdit as any).billingDate),
           category: subscriptionToEdit!.category ?? "Streaming",
           cycle: subscriptionToEdit!.cycle ?? "monthly",
           description: (subscriptionToEdit as any)?.description ?? "",
@@ -133,9 +96,7 @@ export function AddSubscriptionModal({
 
     try {
       const sharedWithCount =
-        values.sharedWithCount && values.sharedWithCount > 0
-          ? values.sharedWithCount
-          : 1;
+        values.sharedWithCount && values.sharedWithCount > 0 ? values.sharedWithCount : 1;
 
       const payload = {
         name: values.name,
@@ -149,24 +110,11 @@ export function AddSubscriptionModal({
       };
 
       if (isEditMode && subscriptionToEdit) {
-        const docRef = doc(
-          db,
-          "users",
-          currentUser.uid,
-          "subscriptions",
-          subscriptionToEdit.id
-        );
-        await updateDoc(docRef, {
-          ...payload,
-        });
+        const docRef = doc(db, "users", currentUser.uid, "subscriptions", subscriptionToEdit.id);
+        await updateDoc(docRef, { ...payload });
         toast.success("Assinatura atualizada com sucesso!");
       } else {
-        const collectionRef = collection(
-          db,
-          "users",
-          currentUser.uid,
-          "subscriptions"
-        );
+        const collectionRef = collection(db, "users", currentUser.uid, "subscriptions");
         await addDoc(collectionRef, {
           ...payload,
           userId: currentUser.uid,
@@ -192,9 +140,7 @@ export function AddSubscriptionModal({
 
       <DialogContent className="sm:max-w-[525px] bg-slate-900 border-slate-700 text-white">
         <DialogHeader>
-          <DialogTitle>
-            {isEditMode ? "Editar Assinatura" : "Adicionar Nova Assinatura"}
-          </DialogTitle>
+          <DialogTitle>{isEditMode ? "Editar Assinatura" : "Adicionar Nova Assinatura"}</DialogTitle>
           <DialogDescription>
             {isEditMode
               ? "Atualize os detalhes da sua assinatura."
@@ -207,7 +153,7 @@ export function AddSubscriptionModal({
             onSubmit={form.handleSubmit(onSubmit)}
             className="space-y-4 max-h-[70vh] overflow-y-auto pr-2"
           >
-            {}
+            {/* Nome */}
             <FormField
               control={form.control}
               name="name"
@@ -222,7 +168,7 @@ export function AddSubscriptionModal({
               )}
             />
 
-            {}
+            {/* Valor + Dividido entre */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
@@ -237,15 +183,9 @@ export function AddSubscriptionModal({
                         placeholder="Ex: 39,90"
                         {...field}
                         onChange={(e) =>
-                          field.onChange(
-                            e.target.value === ""
-                              ? undefined
-                              : Number(e.target.value)
-                          )
+                          field.onChange(e.target.value === "" ? undefined : Number(e.target.value))
                         }
-                        value={
-                          field.value === undefined ? "" : String(field.value)
-                        }
+                        value={field.value === undefined ? "" : String(field.value)}
                       />
                     </FormControl>
                     <FormMessage />
@@ -266,15 +206,9 @@ export function AddSubscriptionModal({
                         placeholder="Nº de pessoas"
                         {...field}
                         onChange={(e) =>
-                          field.onChange(
-                            e.target.value === ""
-                              ? undefined
-                              : Number(e.target.value)
-                          )
+                          field.onChange(e.target.value === "" ? undefined : Number(e.target.value))
                         }
-                        value={
-                          field.value === undefined ? "1" : String(field.value)
-                        }
+                        value={field.value === undefined ? "1" : String(field.value)}
                       />
                     </FormControl>
                     <FormMessage />
@@ -283,7 +217,7 @@ export function AddSubscriptionModal({
               />
             </div>
 
-            {}
+            {/* Categoria */}
             <FormField
               control={form.control}
               name="category"
@@ -296,13 +230,7 @@ export function AddSubscriptionModal({
                         <SelectValue placeholder="Selecione uma categoria" />
                       </SelectTrigger>
                       <SelectContent>
-                        {[
-                          "Streaming",
-                          "Trabalho",
-                          "Bem-estar",
-                          "Jogos",
-                          "Outro",
-                        ].map((cat) => (
+                        {["Streaming", "Trabalho", "Bem-estar", "Jogos", "Outro"].map((cat) => (
                           <SelectItem key={cat} value={cat}>
                             {cat}
                           </SelectItem>
@@ -315,7 +243,7 @@ export function AddSubscriptionModal({
               )}
             />
 
-            {}
+            {/* Ciclo */}
             <FormField
               control={form.control}
               name="cycle"
@@ -338,7 +266,7 @@ export function AddSubscriptionModal({
               )}
             />
 
-            {}
+            {/* Data da cobrança */}
             <FormField
               control={form.control}
               name="billingDate"
@@ -379,7 +307,7 @@ export function AddSubscriptionModal({
               )}
             />
 
-            {}
+            {/* Descrição */}
             <FormField
               control={form.control}
               name="description"
@@ -400,7 +328,7 @@ export function AddSubscriptionModal({
               )}
             />
 
-            {}
+            {/* Modo Fantasma */}
             <FormField
               control={form.control}
               name="isGhost"
@@ -413,22 +341,15 @@ export function AddSubscriptionModal({
                     </p>
                   </div>
                   <FormControl>
-                    <Switch
-                      checked={!!field.value}
-                      onCheckedChange={(v: boolean) => field.onChange(v)}
-                    />
+                    <Switch checked={!!field.value} onCheckedChange={(v: boolean) => field.onChange(v)} />
                   </FormControl>
                 </FormItem>
               )}
             />
 
-            {}
+            {/* Botão salvar */}
             <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading
-                ? "Salvando..."
-                : isEditMode
-                ? "Salvar Alterações"
-                : "Salvar Assinatura"}
+              {isLoading ? "Salvando..." : isEditMode ? "Salvar Alterações" : "Salvar Assinatura"}
             </Button>
           </form>
         </Form>
