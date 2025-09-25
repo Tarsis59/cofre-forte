@@ -10,7 +10,6 @@ import {
     TrendingUp,
 } from "lucide-react";
 
-// Mapeamos os nomes dos ícones (texto) para os componentes reais
 const icons = {
   Footprints,
   ListChecks,
@@ -20,7 +19,7 @@ const icons = {
   Award,
 };
 
-// Definimos o tipo para os nomes dos nossos ícones
+// Garantimos que este tipo seja exportado para ser usado em outros lugares
 export type IconName = keyof typeof icons;
 
 interface DynamicIconProps extends LucideProps {
@@ -30,7 +29,6 @@ interface DynamicIconProps extends LucideProps {
 export function DynamicIcon({ name, ...props }: DynamicIconProps) {
   const IconComponent = icons[name];
 
-  // Se o ícone não for encontrado, não renderiza nada para evitar erros
   if (!IconComponent) {
     return null;
   }
