@@ -2,8 +2,8 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { LucideIcon } from "lucide-react";
+import { ReactNode } from "react";
 import CountUp from "react-countup";
-
 interface StatCardProps {
   title: string;
   value: number;
@@ -11,6 +11,7 @@ interface StatCardProps {
   description?: string;
   prefix?: string;
   decimals?: number;
+  backContent?: ReactNode;
   ghostValue?: number;
 }
 
