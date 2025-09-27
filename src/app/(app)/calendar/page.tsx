@@ -136,7 +136,7 @@ export default function CalendarPage() {
         {}
         <div className="flex flex-col items-center justify-center text-center">
           <AnimatedGradientText
-            text="Calendário de Cobranças"
+            text="Calendário de Cobrança"
             className="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tighter"
           />
           <p className="text-slate-400 mt-2 text-sm sm:text-base md:text-lg">
