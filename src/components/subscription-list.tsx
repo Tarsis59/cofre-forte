@@ -49,6 +49,23 @@ interface SubscriptionListProps {
   setFilterCategory?: (category: string | null) => void;
 }
 
+function toDateSafe(val: unknown): Date {
+  if (val == null) return new Date();
+  // Firestore Timestamp-like
+  if (typeof (val as any)?.toDate === "function") {
+    try {
+      return (val as any).toDate();
+    } catch {}
+  }
+  if (val instanceof Date) return val;
+  if (typeof val === "number" && !Number.isNaN(val)) return new Date(val);
+  if (typeof val === "string") {
+    const parsed = Date.parse(val);
+    if (!Number.isNaN(parsed)) return new Date(parsed);
+  }
+  return new Date();
+}
+
 export function SubscriptionList({
   subscriptions,
   isSimulationMode = false,
@@ -81,7 +98,7 @@ export function SubscriptionList({
   const handleDelete = async (subscriptionId: string) => {
     const currentUser = auth.currentUser;
     if (!currentUser) {
-      alert("Usuário não autenticado.");
+      toast.error("Usuário não autenticado.");
       return;
     }
 
@@ -103,26 +120,6 @@ export function SubscriptionList({
       setIsDeleting(false);
     }
   };
-
-  const visibleSubscriptions = useMemo(() => {
-    if (!filterCategory) return subscriptions;
-    return subscriptions.filter(
-      (s) => (s.category ?? "Outro") === filterCategory
-    );
-  }, [subscriptions, filterCategory]);
-
-  if (!subscriptions || subscriptions.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center gap-4 text-center h-full min-h-[200px] p-4 rounded-lg bg-slate-900/50 border-2 border-dashed border-slate-700">
-        <h3 className="font-semibold text-white">
-          Nenhuma assinatura encontrada
-        </h3>
-        <p className="text-sm text-slate-400">
-          Clique em "Nova Assinatura" para começar a organizar suas finanças.
-        </p>
-      </div>
-    );
-  }
 
   const calculateUserShare = (sub: Subscription) => {
     const valueNumber =
@@ -167,6 +164,7 @@ export function SubscriptionList({
         });
     } else {
       try {
+        // fallback copy
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         // @ts-ignore
         const el = document.createElement("textarea");
@@ -183,9 +181,28 @@ export function SubscriptionList({
     }
   };
 
+  const visibleSubscriptions = useMemo(() => {
+    if (!filterCategory) return subscriptions;
+    return subscriptions.filter(
+      (s) => (s.category ?? "Outro") === filterCategory
+    );
+  }, [subscriptions, filterCategory]);
+
+  if (!subscriptions || subscriptions.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-4 text-center h-full min-h-[200px] p-4 rounded-lg bg-slate-900/50 border-2 border-dashed border-slate-700">
+        <h3 className="font-semibold text-white">
+          Nenhuma assinatura encontrada
+        </h3>
+        <p className="text-sm text-slate-400">
+          Clique em "Nova Assinatura" para começar a organizar suas finanças.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-4">
-      {}
       <div className="flex flex-wrap items-center gap-2">
         <Button
           size="sm"
@@ -215,7 +232,6 @@ export function SubscriptionList({
         ))}
       </div>
 
-      {}
       <div className="w-full overflow-x-auto rounded-lg border border-slate-700/50">
         <Table className="min-w-[600px]">
           <TableHeader>
@@ -243,11 +259,7 @@ export function SubscriptionList({
               const logoUrl = getLogoForSubscription(sub.name);
               const isDeactivated = deactivatedIds.has(sub.id);
 
-              const billingDateObj: Date =
-                sub.billingDate &&
-                typeof (sub.billingDate as any).toDate === "function"
-                  ? (sub.billingDate as any).toDate()
-                  : (sub.billingDate as Date) ?? new Date();
+              const billingDateObj: Date = toDateSafe((sub as any).billingDate);
 
               const valueNumber =
                 typeof sub.value === "number"
@@ -266,17 +278,17 @@ export function SubscriptionList({
                       "opacity-40 line-through"
                   )}
                 >
-                  {}
                   {isSimulationMode && (
                     <TableCell>
                       <Checkbox
                         checked={!isDeactivated}
-                        onCheckedChange={() => onToggleDeactivated(sub.id)}
+                        onCheckedChange={() =>
+                          onToggleDeactivated && onToggleDeactivated(sub.id)
+                        }
                       />
                     </TableCell>
                   )}
 
-                  {}
                   <TableCell className="font-medium">
                     <div className="flex items-center gap-3">
                       {logoUrl ? (
@@ -303,7 +315,6 @@ export function SubscriptionList({
                     </div>
                   </TableCell>
 
-                  {}
                   <TableCell className="whitespace-nowrap">
                     <div>
                       <span className="font-semibold text-white">
@@ -327,16 +338,13 @@ export function SubscriptionList({
                     </div>
                   </TableCell>
 
-                  {}
                   <TableCell className="whitespace-nowrap">
                     {billingDateObj.toLocaleDateString("pt-BR")}
                   </TableCell>
 
-                  {}
                   {!isSimulationMode && (
                     <TableCell className="text-right whitespace-nowrap">
                       <div className="flex items-center justify-end gap-2">
-                        {}
                         {isShared && (
                           <Button
                             variant="ghost"
@@ -348,7 +356,6 @@ export function SubscriptionList({
                           </Button>
                         )}
 
-                        {}
                         <AddSubscriptionModal
                           subscriptionToEdit={sub}
                           trigger={
@@ -362,7 +369,6 @@ export function SubscriptionList({
                           }
                         />
 
-                        {}
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
                             <Button
@@ -382,7 +388,6 @@ export function SubscriptionList({
                                 Essa ação não pode ser desfeita. Isso irá
                                 deletar permanentemente a assinatura{" "}
                                 <span className="font-bold text-white">
-                                  {" "}
                                   {sub.name}
                                 </span>
                                 .

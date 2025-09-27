@@ -34,26 +34,36 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 
+import { auth, db } from "@/lib/firebase";
 import { cn } from "@/lib/utils";
 import { Subscription } from "@/types";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { CalendarIcon } from "lucide-react";
-import { ReactNode, useState } from "react";
-import { useForm } from "react-hook-form";
-import { z } from "zod";
-
-import { auth, db } from "@/lib/firebase";
 import {
-  Timestamp,
   addDoc,
   collection,
   doc,
+  Timestamp,
   updateDoc,
 } from "firebase/firestore";
-
+import { CalendarIcon } from "lucide-react";
+import { ReactNode, useState } from "react";
+import { useForm, type Resolver } from "react-hook-form";
 import toast from "react-hot-toast";
+import { z } from "zod";
+
+const toDateOrUndefined = (val: any): Date | undefined => {
+  if (val == null) return undefined;
+  if (val instanceof Date) return val;
+  if (typeof val === "number" && !Number.isNaN(val)) return new Date(val);
+  if (typeof val?.toDate === "function") return val.toDate();
+  if (typeof val === "string") {
+    const parsed = Date.parse(val);
+    return isNaN(parsed) ? undefined : new Date(parsed);
+  }
+  return undefined;
+};
 
 const subscriptionSchema = z.object({
   name: z
@@ -64,11 +74,11 @@ const subscriptionSchema = z.object({
     .number()
     .min(1, { message: "Deve ser pelo menos 1." })
     .optional(),
-  billingDate: z.date(),
   category: z.enum(["Streaming", "Trabalho", "Bem-estar", "Jogos", "Outro"]),
   cycle: z.enum(["monthly", "annually"]),
-  isGhost: z.boolean().default(false),
+  billingDate: z.preprocess((v) => toDateOrUndefined(v), z.date()),
   description: z.string().optional(),
+  isGhost: z.boolean().default(false),
 });
 
 interface AddSubscriptionModalProps {
@@ -82,32 +92,32 @@ export function AddSubscriptionModal({
 }: AddSubscriptionModalProps) {
   const [open, setOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-
   const isEditMode = !!subscriptionToEdit;
 
+  const resolver = zodResolver(subscriptionSchema) as unknown as Resolver<
+    z.infer<typeof subscriptionSchema>,
+    any
+  >;
+
   const billingDateToDate = (val: any): Date => {
-    if (!val) return new Date();
-    if (typeof val?.toDate === "function") return val.toDate();
-    if (val instanceof Date) return val;
-    if (typeof val === "number") return new Date(val);
-    const parsed = Date.parse(val);
-    return isNaN(parsed) ? new Date() : new Date(parsed);
+    const d = toDateOrUndefined(val);
+    return d ?? new Date();
   };
 
   const form = useForm<z.infer<typeof subscriptionSchema>>({
-    resolver: zodResolver(subscriptionSchema),
+    resolver,
     defaultValues: isEditMode
       ? {
-          name: subscriptionToEdit!.name,
-          value: subscriptionToEdit!.value,
+          name: subscriptionToEdit!.name ?? "",
+          value: (subscriptionToEdit as any)?.value ?? undefined,
           sharedWithCount: (subscriptionToEdit as any)?.sharedWithCount ?? 1,
           billingDate: billingDateToDate(
-            (subscriptionToEdit as any).billingDate
+            (subscriptionToEdit as any)?.billingDate
           ),
-          category: subscriptionToEdit!.category ?? "Streaming",
-          cycle: subscriptionToEdit!.cycle ?? "monthly",
+          category: (subscriptionToEdit as any)?.category ?? "Streaming",
+          cycle: (subscriptionToEdit as any)?.cycle ?? "monthly",
           description: (subscriptionToEdit as any)?.description ?? "",
-          isGhost: subscriptionToEdit!.isGhost ?? false,
+          isGhost: (subscriptionToEdit as any)?.isGhost ?? false,
         }
       : {
           name: "",
@@ -123,7 +133,6 @@ export function AddSubscriptionModal({
 
   const onSubmit = async (values: z.infer<typeof subscriptionSchema>) => {
     setIsLoading(true);
-
     const currentUser = auth.currentUser;
     if (!currentUser) {
       toast.error("Usuário não autenticado.");
@@ -137,7 +146,7 @@ export function AddSubscriptionModal({
           ? values.sharedWithCount
           : 1;
 
-      const payload = {
+      const payload: any = {
         name: values.name,
         value: values.value,
         sharedWithCount,
@@ -188,7 +197,7 @@ export function AddSubscriptionModal({
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{trigger}</DialogTrigger>
 
-      <DialogContent className="sm:max-w-[525px] bg-slate-900 border-slate-700 text-white">
+      <DialogContent className="sm:max-w-lg bg-slate-900 border-slate-700 text-white">
         <DialogHeader>
           <DialogTitle>
             {isEditMode ? "Editar Assinatura" : "Adicionar Nova Assinatura"}
@@ -205,6 +214,7 @@ export function AddSubscriptionModal({
             onSubmit={form.handleSubmit(onSubmit)}
             className="space-y-4 max-h-[70vh] overflow-y-auto pr-2"
           >
+            {}
             {/* Nome */}
             <FormField
               control={form.control}
@@ -236,9 +246,7 @@ export function AddSubscriptionModal({
                         {...field}
                         onChange={(e) =>
                           field.onChange(
-                            e.target.value === ""
-                              ? undefined
-                              : Number(e.target.value)
+                            e.target.value === "" ? undefined : e.target.value
                           )
                         }
                         value={
@@ -265,9 +273,7 @@ export function AddSubscriptionModal({
                         {...field}
                         onChange={(e) =>
                           field.onChange(
-                            e.target.value === ""
-                              ? undefined
-                              : Number(e.target.value)
+                            e.target.value === "" ? "" : e.target.value
                           )
                         }
                         value={
@@ -336,7 +342,7 @@ export function AddSubscriptionModal({
               )}
             />
 
-            {/* Data da cobrança */}
+            {/* BillingDate */}
             <FormField
               control={form.control}
               name="billingDate"
@@ -362,7 +368,6 @@ export function AddSubscriptionModal({
                         </Button>
                       </FormControl>
                     </PopoverTrigger>
-
                     <PopoverContent className="w-auto p-0" align="start">
                       <Calendar
                         mode="single"
@@ -387,10 +392,10 @@ export function AddSubscriptionModal({
                   <FormControl>
                     <Textarea
                       placeholder="Ex: Plano família, dividido com mais 3 pessoas."
-                      className="resize-none"
                       {...field}
                       value={field.value ?? ""}
                       onChange={(e) => field.onChange(e.target.value)}
+                      className="resize-none"
                     />
                   </FormControl>
                   <FormMessage />
@@ -398,7 +403,7 @@ export function AddSubscriptionModal({
               )}
             />
 
-            {/* Modo Fantasma */}
+            {/* isGhost */}
             <FormField
               control={form.control}
               name="isGhost"
@@ -420,7 +425,6 @@ export function AddSubscriptionModal({
               )}
             />
 
-            {/* Botão salvar */}
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading
                 ? "Salvando..."
